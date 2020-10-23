@@ -120,6 +120,8 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+int             waitx(int*, int*);
+void            increment_runtime();
 
 // swtch.S
 void            swtch(struct context**, struct context*);
