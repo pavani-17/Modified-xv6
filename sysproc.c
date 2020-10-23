@@ -97,7 +97,7 @@ sys_waitx (void)
   int *rtime;
   if(argptr(0,(void*)&wtime,sizeof(int*)) < 0)
     return -1;
-  if(argptr(0,(void*)&rtime, sizeof(int*)) < 0)
+  if(argptr(1,(void*)&rtime, sizeof(int*)) < 0)
     return -1;
   return waitx(wtime, rtime);
 }

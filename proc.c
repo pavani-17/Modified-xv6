@@ -244,6 +244,9 @@ exit(void)
       curproc->ofile[fd] = 0;
     }
   }
+  acquire(&tickslock);
+  curproc->etime = ticks;
+  release(&tickslock);
 
   begin_op();
   iput(curproc->cwd);
@@ -265,9 +268,6 @@ exit(void)
   }
 
   // Jump into the scheduler, never to return.
-  acquire(&tickslock);
-  p->etime = ticks;
-  release(&tickslock);
   curproc->state = ZOMBIE;
   sched();
   panic("zombie exit");
