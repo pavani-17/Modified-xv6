@@ -332,6 +332,7 @@ scheduler(void)
   struct cpu *c = mycpu();
   c->proc = 0;
   
+  #if SCHEDULER == SCHED_RR
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -357,8 +358,40 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
-
   }
+
+  #elif SCHEDULER == SCHED_FCFS
+  int min;
+  struct proc* selected;
+  for(;;){
+    selected = 0;
+    min = ticks + 5; 
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      if( min > p->ctime)
+      {
+        min = p->ctime;
+        selected = p;
+      }
+    }
+    if(selected != 0)
+    {
+      c->proc = selected;
+      switchuvm(selected);
+      selected->state = RUNNING;
+      swtch(&(c->scheduler), selected->context);
+      switchkvm();
+    }
+    c->proc = 0;
+    release(&ptable.lock);
+  }
+  #endif
 }
 
 // Enter scheduler.  Must hold only ptable.lock

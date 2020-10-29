@@ -190,3 +190,8 @@ void            clearpteu(pde_t *pgdir, char *uva);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+#define SCHED_RR 0
+#define SCHED_FCFS 1
+#define SCHED_PBS 2
+#define SCHED_MLFQ 3
