@@ -51,7 +51,7 @@ trap(struct trapframe *tf)
     if(cpuid() == 0){
       acquire(&tickslock);
       ticks++;
-      increment_runtime();
+      update_times();
       wakeup(&ticks);
       release(&tickslock);
     }
@@ -105,7 +105,7 @@ trap(struct trapframe *tf)
   // If interrupts were on while locks held, would need to check nlock.
 
   // Check for round robin
-  #if SCHEDULER == SCHED_RR
+  #if SCHEDULER != SCHED_FCFS
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
     yield();

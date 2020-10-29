@@ -52,6 +52,8 @@ struct proc {
   uint ctime;                  // Creation time of the process (Number of ticks till creation)
   uint etime;                  // End time of the process (Number of ticks till process ends)
   uint rtime;                  // Number of ticks the program has run for
+  uint w_time;                 // Number of ticks the process has been waiting for (Reset to 0 everytime it gets CPU)
+  uint tw_time;                 // Total wait time
   int n_run;                   // Number of times the scheduler has picked the process
   uint priority;               // Priority of the task (Applicable for PBS)
 };

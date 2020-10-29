@@ -35,7 +35,7 @@ int main (int argc, char* argv[])
                 printf(2,"time: Child process not found\n");
                 exit();
             }
-            printf(1,"Process %s\n \t Running Time : %d \n \t Sleeping Time : %d \n",argv[1],rtime,wtime);
+            printf(1,"Process %s\n \t Running Time : %d \n \t Waiting Time : %d \n",argv[1],rtime,wtime);
             exit();
         }
         

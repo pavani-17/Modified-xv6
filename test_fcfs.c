@@ -28,5 +28,4 @@ int main(void)
     {
         wait();
     }
-    exit();
 }

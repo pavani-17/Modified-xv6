@@ -98,6 +98,8 @@ found:
   p->priority = -1;
   #endif
   p->n_run = 0;
+  p->w_time = 0;
+  p->tw_time = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -365,6 +367,7 @@ scheduler(void)
     }
     release(&ptable.lock);
   }
+
   #elif SCHEDULER == SCHED_FCFS
   int create_time;
   struct proc* selected;
@@ -403,8 +406,53 @@ scheduler(void)
   }
 
   #elif SCHEDULER == SCHED_PBS
-  int priority = 101;
-  struct stat* selected;
+  int priority, max_wait;
+  struct proc* selected;
+  for(;;){
+    selected = 0;
+    priority = 101;
+    max_wait = ticks;
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+
+      // Search for minimum priority
+      if(priority > p->priority)
+      {
+        priority = p->priority;
+        selected = p;
+        max_wait = p->w_time;
+      }
+      else if (priority == p->priority)
+      {
+        if(max_wait < p->w_time)
+        {
+          priority = p->priority;
+          selected = p;
+          max_wait = p->w_time;
+        }
+      }
+    }
+    // Execute the above selected process
+    if(selected != 0)
+    {
+      //cprintf("Process with pid %d and priority %d running on CPU %d\n",selected->pid,selected->priority,c->apicid);
+      c->proc = selected;
+      switchuvm(selected);
+      selected->state = RUNNING;
+      selected->w_time = 0;
+      selected->n_run ++;
+      swtch(&(c->scheduler), selected->context);
+      switchkvm();
+    }
+    c->proc = 0;
+    release(&ptable.lock);
+  }
   #endif
 }
 
@@ -616,7 +664,7 @@ waitx(int* wtime, int* rtime)
         p->killed = 0;
         p->state = UNUSED;
         *rtime = p->rtime;
-        *wtime = p->etime - p->ctime - p->rtime;
+        *wtime = p->tw_time;
         release(&ptable.lock);
         return pid;
       }
@@ -634,7 +682,9 @@ waitx(int* wtime, int* rtime)
 }
 
 // Increment the runtime of all RUNNING processes
-void increment_runtime()
+// Increment the waittime of all RUNNABLE processes
+void 
+update_times()
 {
   struct proc* p;
   acquire(&ptable.lock);
@@ -644,6 +694,40 @@ void increment_runtime()
     {
       p->rtime ++;
     }
+    if(p->state == RUNNABLE)
+    {
+      p->tw_time++;
+      p->w_time++;
+    }
   }
   release(&ptable.lock);
+}
+
+// Change the priority of the a process (For priority based scheduling)
+int
+set_priority (int new_priority, int pid)
+{
+  struct proc* p;
+  int old_priority = 101;
+  acquire(&ptable.lock);
+  for(p=ptable.proc; p < &ptable.proc[NPROC];p++)
+  {
+    if(p->pid == pid)
+    {
+      old_priority = p->priority;
+      p->priority = new_priority;
+      break;
+    }
+  }
+  if(old_priority == 101)
+  {
+    cprintf("No process with pid %d \n",pid);
+    return -1;
+  }
+  release(&ptable.lock);
+  if(old_priority > new_priority) // If priority increases, reschedule
+  {
+    yield();
+  }
+  return old_priority;
 }
