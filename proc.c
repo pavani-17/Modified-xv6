@@ -92,6 +92,12 @@ found:
   p->ctime = ticks;
   release(&tickslock);
   p->rtime = 0;
+  #if SCHEDULER == SCHED_PBS
+  p->priority = 60;
+  #else
+  p->priority = -1;
+  #endif
+  p->n_run = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -349,7 +355,7 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-
+      p->n_run ++;
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
@@ -359,13 +365,12 @@ scheduler(void)
     }
     release(&ptable.lock);
   }
-
   #elif SCHEDULER == SCHED_FCFS
-  int min;
+  int create_time;
   struct proc* selected;
   for(;;){
     selected = 0;
-    min = ticks + 5; 
+    create_time = ticks + 5; 
     // Enable interrupts on this processor.
     sti();
 
@@ -374,23 +379,32 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-      if( min > p->ctime)
+
+      // Search for minimum creation time
+      if(create_time > p->ctime)
       {
-        min = p->ctime;
+        create_time = p->ctime;
         selected = p;
       }
     }
+    // Execute the above selected process
     if(selected != 0)
     {
+      //cprintf("Process with pid %d running on CPU %d\n",selected->pid,c->apicid);
       c->proc = selected;
       switchuvm(selected);
       selected->state = RUNNING;
+      selected->n_run ++;
       swtch(&(c->scheduler), selected->context);
       switchkvm();
     }
     c->proc = 0;
     release(&ptable.lock);
   }
+
+  #elif SCHEDULER == SCHED_PBS
+  int priority = 101;
+  struct stat* selected;
   #endif
 }
 

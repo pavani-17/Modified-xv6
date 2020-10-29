@@ -52,6 +52,8 @@ struct proc {
   uint ctime;                  // Creation time of the process (Number of ticks till creation)
   uint etime;                  // End time of the process (Number of ticks till process ends)
   uint rtime;                  // Number of ticks the program has run for
+  int n_run;                   // Number of times the scheduler has picked the process
+  uint priority;               // Priority of the task (Applicable for PBS)
 };
 
 // Process memory is laid out contiguously, low addresses first:
