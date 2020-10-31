@@ -100,6 +100,7 @@ found:
   p->n_run = 0;
   p->w_time = 0;
   p->tw_time = 0;
+  #if SCHEDULER == SCHED_MLFQ
   p->cur_q = 0;
   p->n_ticks = 0;
   p->q[0] = 0;
@@ -107,6 +108,15 @@ found:
   p->q[2] = 0;
   p->q[3] = 0;
   p->q[4] = 0;
+  #else
+  p->cur_q = -1;
+  p->n_ticks = -1;
+  p->q[0] = -1;
+  p->q[1] = -1;
+  p->q[2] = -1;
+  p->q[3] = -1;
+  p->q[4] = -1;
+  #endif
   release(&ptable.lock);
 
   // Allocate kernel stack.
