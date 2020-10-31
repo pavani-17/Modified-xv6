@@ -88,9 +88,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  acquire(&tickslock);
+  // acquire(&tickslock);
   p->ctime = ticks;
-  release(&tickslock);
+  // release(&tickslock);
   p->rtime = 0;
   #if SCHEDULER == SCHED_PBS
   p->priority = 60;
@@ -100,6 +100,13 @@ found:
   p->n_run = 0;
   p->w_time = 0;
   p->tw_time = 0;
+  p->cur_q = 0;
+  p->n_ticks = 0;
+  p->q[0] = 0;
+  p->q[1] = 0;
+  p->q[2] = 0;
+  p->q[3] = 0;
+  p->q[4] = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -160,6 +167,9 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  #if SCHEDULER == SCHED_MLFQ
+  push_queue(p->cur_q, p->pid);
+  #endif
 
   release(&ptable.lock);
 }
@@ -226,6 +236,9 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  #if SCHEDULER == SCHED_MLFQ
+  push_queue(np->cur_q, np->pid);
+  #endif
 
   release(&ptable.lock);
 
@@ -252,9 +265,9 @@ exit(void)
       curproc->ofile[fd] = 0;
     }
   }
-  acquire(&tickslock);
+  //acquire(&tickslock);
   curproc->etime = ticks;
-  release(&tickslock);
+  // release(&tickslock);
 
   begin_op();
   iput(curproc->cwd);
@@ -336,11 +349,10 @@ wait(void)
 void
 scheduler(void)
 {
-  struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
   #if SCHEDULER == SCHED_RR
+  struct proc *p;
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -357,6 +369,7 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
+      p->w_time = 0;
       p->n_run ++;
       swtch(&(c->scheduler), p->context);
       switchkvm();
@@ -369,6 +382,7 @@ scheduler(void)
   }
 
   #elif SCHEDULER == SCHED_FCFS
+  struct proc *p;
   int create_time;
   struct proc* selected;
   for(;;){
@@ -397,6 +411,7 @@ scheduler(void)
       c->proc = selected;
       switchuvm(selected);
       selected->state = RUNNING;
+      selected->w_time = 0;
       selected->n_run ++;
       swtch(&(c->scheduler), selected->context);
       switchkvm();
@@ -406,6 +421,7 @@ scheduler(void)
   }
 
   #elif SCHEDULER == SCHED_PBS
+  struct proc *p;
   int priority, max_wait;
   struct proc* selected;
   for(;;){
@@ -453,6 +469,56 @@ scheduler(void)
     c->proc = 0;
     release(&ptable.lock);
   }
+  
+  #elif SCHEDULER == SCHED_MLFQ
+  struct proc* selected;
+  struct proc* p;
+  int selected_pid = -1;
+  int i;
+  for(;;)
+  {
+    sti();
+    selected = 0;
+    selected_pid = -1;
+    acquire(&ptable.lock);
+    for(i=0;i<5;i++)
+    {
+      if(top_queue(i) != -1)
+      {
+        selected_pid = top_queue(i);
+        break;
+      }
+    }
+    if(selected_pid == -1)
+    {
+      release(&ptable.lock);
+      continue;
+    }
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid == selected_pid)
+      {
+        selected = p;
+        break;
+      }
+    }
+    pop_queue(selected->cur_q);
+    if(selected != 0)
+    {
+      //cprintf("Selected process with pid %d in queue %d\n",selected->pid,selected->cur_q);
+      c->proc = selected;
+      switchuvm(selected);
+      selected->state = RUNNING;
+      selected->n_ticks = 0;
+      selected->w_time = 0;
+      selected->n_run ++;
+      swtch(&(c->scheduler), selected->context);
+      switchkvm();
+    }
+    c->proc = 0;
+    release(&ptable.lock);
+  }
+  #else
+  while(1);
   #endif
 }
 
@@ -488,6 +554,9 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  #if SCHEDULER == SCHED_MLFQ
+    push_queue(myproc()->cur_q, myproc()->pid);
+  #endif
   sched();
   release(&ptable.lock);
 }
@@ -562,7 +631,12 @@ wakeup1(void *chan)
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan)
+    {
       p->state = RUNNABLE;
+      #if SCHEDULER == SCHED_MLFQ
+        push_queue(p->cur_q, p->pid);
+      #endif
+    }
 }
 
 // Wake up all processes sleeping on chan.
@@ -588,7 +662,12 @@ kill(int pid)
       p->killed = 1;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
+      {
         p->state = RUNNABLE;
+        #if SCHEDULER == SCHED_MLFQ
+        push_queue(p->cur_q, p->pid);
+        #endif
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -624,7 +703,7 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d %s %s", p->pid, state, p->name);
+    cprintf("%d %s %s %d", p->pid, state, p->name, p->cur_q);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)
@@ -693,11 +772,26 @@ update_times()
     if(p->state == RUNNING)
     {
       p->rtime ++;
+      #if SCHEDULER == SCHED_MLFQ
+      p->n_ticks++;
+      #endif 
     }
     if(p->state == RUNNABLE)
     {
       p->tw_time++;
       p->w_time++;
+      #if SCHEDULER == SCHED_MLFQ
+      //cprintf("%d %d\n",p->w_time, queues_aging[p->cur_q]);
+      if(p->w_time > queues_aging[p->cur_q] && p->cur_q != 0)
+      {
+        pop_pid_queue(p->cur_q, p->pid);
+        p->cur_q --;
+        push_queue(p->cur_q,p->pid);
+        p->w_time = 0;
+        //cprintf("Process %d went to queue %d due to aging \n",p->pid, p->cur_q);
+      }
+      p->q[p->cur_q]++;
+      #endif
     }
   }
   release(&ptable.lock);
@@ -709,7 +803,7 @@ set_priority (int new_priority, int pid)
 {
   struct proc* p;
   int old_priority = 101;
-  acquire(&ptable.lock);
+  // acquire(&ptable.lock);
   for(p=ptable.proc; p < &ptable.proc[NPROC];p++)
   {
     if(p->pid == pid)
@@ -722,12 +816,111 @@ set_priority (int new_priority, int pid)
   if(old_priority == 101)
   {
     cprintf("No process with pid %d \n",pid);
+    // release(&ptable.lock);
     return -1;
   }
-  release(&ptable.lock);
+  //release(&ptable.lock);
   if(old_priority > new_priority) // If priority increases, reschedule
   {
     yield();
   }
   return old_priority;
+}
+
+// Push a process into the queue
+void
+push_queue (int q_no, int p)
+{
+  queues[q_no][++queues_tails[q_no]] = p;
+  return;
+}
+
+// Pop a process from the queue
+void 
+pop_queue (int q_no)
+{
+  int i;
+  if(queues_tails[q_no] == -1)
+  {
+    return;
+  }
+  for(i=0; i<= queues_tails[q_no] - 1; i++)
+  {
+    queues[q_no][i] = queues[q_no][i+1];
+  }
+  queues_tails[q_no]--;
+  return;
+}
+
+// Pop process based on pid
+void
+pop_pid_queue (int q_no, int pid)
+{
+  int i;
+  if(queues_tails[q_no] == -1)
+  {
+    return;
+  }
+  for(i=0;i<=queues_tails[q_no];i++)
+  {
+    if(queues[q_no][i] == pid)
+    {
+      break;
+    }
+  }
+  for(;i<= queues_tails[q_no] - 1; i++)
+  {
+    queues[q_no][i] = queues[q_no][i+1];
+  }
+  queues_tails[q_no]--;
+  return;
+}
+
+// Return the first element of the queue
+int
+top_queue (int q_no)
+{
+  if(queues_tails[q_no] == -1)
+  {
+    return -1;
+  }
+  else
+  {
+    return queues[q_no][0];
+  }
+}
+
+// Initialise the queue
+void 
+q_init()
+{
+  int i;
+  for(i=0;i<5;i++)
+  {
+    queues_tails[i] = -1;
+    switch(i)
+    {
+      case 0:
+        queues_maxticks[i] = 1;
+        queues_aging[i] = -1;
+        break;
+      case 1:
+        queues_maxticks[i] = 2;
+        queues_aging[i] = 20;
+        break;
+      case 2:
+        queues_maxticks[i] = 4;
+        queues_aging[i] = 35;
+        break;
+      case 3:
+        queues_maxticks[i] = 8;
+        queues_aging[i] = 50;
+        break;
+      case 4:
+        queues_maxticks[i] = 16;
+        queues_aging[i] = 65;
+        break;
+    }
+  }
+
 }

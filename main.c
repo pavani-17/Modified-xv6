@@ -26,6 +26,9 @@ main(void)
   ioapicinit();    // another interrupt controller
   consoleinit();   // console hardware
   uartinit();      // serial port
+  #if SCHEDULER == SCHED_MLFQ
+  q_init();
+  #endif
   pinit();         // process table
   tvinit();        // trap vectors
   binit();         // buffer cache

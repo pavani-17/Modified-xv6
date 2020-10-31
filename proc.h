@@ -53,9 +53,12 @@ struct proc {
   uint etime;                  // End time of the process (Number of ticks till process ends)
   uint rtime;                  // Number of ticks the program has run for
   uint w_time;                 // Number of ticks the process has been waiting for (Reset to 0 everytime it gets CPU)
-  uint tw_time;                 // Total wait time
+  uint tw_time;                // Total wait time
   int n_run;                   // Number of times the scheduler has picked the process
   uint priority;               // Priority of the task (Applicable for PBS)
+  uint cur_q;                  // Current queue of the process (Applicable for MLFQ)
+  uint q[5];                   // Number of ticks received in each queue
+  uint n_ticks;                // Number of ticks the process has executed for (reset everytime it changes queue or gets CPU)
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -63,3 +66,8 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+int queues_maxticks[5];
+int queues[5][NPROC];
+int queues_tails[5];
+int queues_aging[5];

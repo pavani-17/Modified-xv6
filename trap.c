@@ -104,12 +104,25 @@ trap(struct trapframe *tf)
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
 
-  // Check for round robin
-  #if SCHEDULER != SCHED_FCFS
-  if(myproc() && myproc()->state == RUNNING &&
-     tf->trapno == T_IRQ0+IRQ_TIMER)
-    yield();
-  #endif
+  // Check for round robin and priority based scheduler for yeilding
+  // Check MLFQ 
+  if(myproc() && myproc()->state == RUNNING && tf->trapno == T_IRQ0+IRQ_TIMER)
+  {
+    #if SCHEDULER == SCHED_MLFQ
+      if(myproc()->n_ticks >= queues_maxticks[myproc()->cur_q])
+      {
+        //cprintf("%d yeilding CPU after %d ticks in queue %d\n",myproc()->pid, myproc()->n_ticks, myproc()->cur_q);
+        if(myproc()->cur_q != 4)
+        {
+          myproc()->cur_q ++;
+        }
+        yield();
+      }
+    #elif SCHEDULER != SCHED_FCFS
+      //cprintf("%d Yeilding CPU\n",myproc()->pid);
+      yield();
+    #endif
+  }
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)

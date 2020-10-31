@@ -123,6 +123,11 @@ void            yield(void);
 int             waitx(int*, int*);
 void            update_times();
 int             set_priority(int, int);
+void            push_queue(int, int);
+void            pop_queue(int);
+int             top_queue(int);
+void            pop_pid_queue(int,int);
+void            q_init();
 
 // swtch.S
 void            swtch(struct context**, struct context*);
