@@ -773,6 +773,7 @@ update_times()
     {
       p->rtime ++;
       #if SCHEDULER == SCHED_MLFQ
+      p->q[p->cur_q]++;
       p->n_ticks++;
       #endif 
     }
@@ -790,7 +791,6 @@ update_times()
         p->w_time = 0;
         //cprintf("Process %d went to queue %d due to aging \n",p->pid, p->cur_q);
       }
-      p->q[p->cur_q]++;
       #endif
     }
   }
@@ -922,5 +922,27 @@ q_init()
         break;
     }
   }
+}
 
+// ps Implementation
+void
+proc_info ()
+{
+  struct proc* p;
+  cprintf(" PID  Priority  State    r_time w_time n_run  cur_q   q0   q1   q2   q3   q4 \n\n");
+  static char *states[] = {
+    [UNUSED]    "unused  ",
+    [EMBRYO]    "embryo  ",
+    [SLEEPING]  "sleeping",
+    [RUNNABLE]  "runnable",
+    [RUNNING]   "running ",
+    [ZOMBIE]    "zombie  "
+  };
+  for(p=ptable.proc; p != &ptable.proc[NPROC]; p++)
+  {
+    if(p->state == UNUSED) continue;
+    cprintf(" %d    %d        %s    %d      %d      %d     %d    %d    %d    %d    %d   %d\n",
+      p->pid, p->priority, states[p->state], p->rtime, p->w_time, p->n_run, p->cur_q, p->q[0], p->q[1], p->q[2], p->q[3], p->q[4] );
+  }
+  return;
 }

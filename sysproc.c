@@ -102,7 +102,8 @@ sys_waitx (void)
   return waitx(wtime, rtime);
 }
 
-int sys_set_priority(void)
+int 
+sys_set_priority(void)
 {
   int new_priority, pid;
   if(argint(0, &new_priority) < 0)
@@ -110,4 +111,10 @@ int sys_set_priority(void)
   if(argint(1, &pid) < 0)
     return -1;
   return set_priority(new_priority, pid);
+}
+
+void
+sys_proc_info(void)
+{
+  return proc_info();
 }
