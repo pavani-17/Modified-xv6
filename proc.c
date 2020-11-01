@@ -119,6 +119,10 @@ found:
   #endif
   release(&ptable.lock);
 
+  //#ifdef GRAPH
+  //cprintf("%d %d %d\n",p->pid, p->ctime, p->cur_q);
+  //#endif
+
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
@@ -178,6 +182,7 @@ userinit(void)
 
   p->state = RUNNABLE;
   #if SCHEDULER == SCHED_MLFQ
+  //cprintf("%d %d %d \n",p->pid, ticks, p->cur_q);
   push_queue(p->cur_q, p->pid);
   #endif
 
@@ -247,6 +252,7 @@ fork(void)
 
   np->state = RUNNABLE;
   #if SCHEDULER == SCHED_MLFQ
+  //cprintf("%d %d %d \n",np->pid, ticks, np->cur_q);
   push_queue(np->cur_q, np->pid);
   #endif
 
@@ -297,7 +303,9 @@ exit(void)
         wakeup1(initproc);
     }
   }
-
+  //#ifdef GRAPH
+  //cprintf("%d %d %d\n",curproc->pid, curproc->etime, curproc->cur_q);
+  //#endif
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();
@@ -645,6 +653,7 @@ wakeup1(void *chan)
       p->state = RUNNABLE;
       #if SCHEDULER == SCHED_MLFQ
         push_queue(p->cur_q, p->pid);
+        //cprintf("%d %d %d \n",p->pid, ticks, p->cur_q);
       #endif
     }
 }
@@ -676,6 +685,7 @@ kill(int pid)
         p->state = RUNNABLE;
         #if SCHEDULER == SCHED_MLFQ
         push_queue(p->cur_q, p->pid);
+        cprintf("%d %d %d \n",p->pid, ticks, p->cur_q);
         #endif
       }
       release(&ptable.lock);
@@ -797,6 +807,9 @@ update_times()
       {
         pop_pid_queue(p->cur_q, p->pid);
         p->cur_q --;
+        //#ifdef GRAPH
+        //cprintf("%d %d %d\n",p->pid, ticks, p->cur_q);
+        //#endif
         push_queue(p->cur_q,p->pid);
         p->w_time = 0;
         //cprintf("Process %d went to queue %d due to aging \n",p->pid, p->cur_q);
@@ -916,19 +929,19 @@ q_init()
         break;
       case 1:
         queues_maxticks[i] = 2;
-        queues_aging[i] = 20;
+        queues_aging[i] = 10;
         break;
       case 2:
         queues_maxticks[i] = 4;
-        queues_aging[i] = 35;
+        queues_aging[i] = 20;
         break;
       case 3:
         queues_maxticks[i] = 8;
-        queues_aging[i] = 50;
+        queues_aging[i] = 30;
         break;
       case 4:
         queues_maxticks[i] = 16;
-        queues_aging[i] = 65;
+        queues_aging[i] = 40;
         break;
     }
   }
