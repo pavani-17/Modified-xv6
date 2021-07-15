@@ -19,7 +19,7 @@ The prototype of `waitx` as follows:
 ```
 int waitx(int* wtime, int* rtime)
 ```
-When a process calls waitx, the calling processes sleeps till one of its children is done executing. It returns the PID of the child process. If a process does not have anu child processes, it returns -1. <br>
+When a process calls waitx, the calling processes sleeps till one of its children is done executing. It returns the PID of the child process. If a process does not have any child processes, it returns -1. <br>
 
 It takes 2 arguments, pointers to the integers which will be assigned values. `wtime` is the total number of ticks the child process was waiting for CPU. `rtime` is the total number of ticks the child process ran for. <br>
 
